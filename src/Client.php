@@ -202,6 +202,12 @@ final class Client
             try {
                 $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
             } catch (\JsonException) {
+                if ($status >= 200 && $status < 300) {
+                    throw new ApiException(
+                        "Invalid JSON response (HTTP {$status}).",
+                        'INVALID_JSON',
+                    );
+                }
                 $decoded = $raw;
             }
         }
@@ -279,23 +285,43 @@ final class Client
         return $out;
     }
 
+    private const RETRY_BASE_MS = 500.0;
+    private const RETRY_CAP_MS = 8000.0;
+
     private static function shouldRetryStatus(int $status): bool
     {
-        return $status === 429 || ($status >= 500 && $status <= 504);
+        return in_array($status, [429, 500, 502, 503, 504], true);
+    }
+
+    private static function parseRetryAfterSeconds(?string $retryAfter): ?float
+    {
+        if ($retryAfter === null || $retryAfter === '') {
+            return null;
+        }
+        $text = trim($retryAfter);
+        if ($text === '') {
+            return null;
+        }
+        if (is_numeric($text)) {
+            return max(0.0, (float) $text);
+        }
+        $ts = strtotime($text);
+        if ($ts === false) {
+            return null;
+        }
+
+        return max(0.0, (float) ($ts - time()));
     }
 
     private static function retryDelayMs(int $retryIndex, ?string $retryAfter): float
     {
-        if ($retryAfter !== null && $retryAfter !== '') {
-            if (is_numeric($retryAfter)) {
-                return max(0.0, (float) $retryAfter) * 1000.0;
-            }
-            $ts = strtotime($retryAfter);
-            if ($ts !== false) {
-                return max(0.0, ($ts - time()) * 1000.0);
-            }
+        $parsed = self::parseRetryAfterSeconds($retryAfter);
+        if ($parsed !== null) {
+            return min($parsed * 1000.0, self::RETRY_CAP_MS);
         }
-        return (float) (250 * (2 ** $retryIndex));
+        $ceiling = min(self::RETRY_CAP_MS, self::RETRY_BASE_MS * (2 ** $retryIndex));
+
+        return (float) (mt_rand() / mt_getrandmax() * $ceiling);
     }
 
     /**
@@ -320,11 +346,7 @@ final class Client
             $message = trim($raw) !== '' ? substr(trim($raw), 0, 500) : "API request failed with status {$statusCode}.";
         }
 
-        $retryAfterHeader = $headers['retry-after'] ?? null;
-        $retryAfter = null;
-        if ($retryAfterHeader !== null && is_numeric($retryAfterHeader)) {
-            $retryAfter = (float) $retryAfterHeader;
-        }
+        $retryAfter = self::parseRetryAfterSeconds($headers['retry-after'] ?? null);
 
         $args = [
             $message,
@@ -337,20 +359,20 @@ final class Client
             $retryAfter,
         ];
 
-        if ($statusCode === 401 || $code === 'INVALID_API_KEY' || $code === 'EXPIRED_API_KEY') {
+        if ($statusCode === 401) {
             throw new AuthenticationException(...$args);
         }
-        if ($statusCode === 403 && $code === 'INSUFFICIENT_SCOPE') {
+        if ($statusCode === 403) {
             throw new InsufficientScopeException(...$args);
         }
         if ($statusCode === 404) {
             throw new NotFoundException(...$args);
         }
-        if ($statusCode === 400 || $statusCode === 422) {
-            throw new ValidationException(...$args);
-        }
         if ($statusCode === 429) {
             throw new RateLimitException(...$args);
+        }
+        if ($statusCode >= 400 && $statusCode < 500) {
+            throw new ValidationException(...$args);
         }
 
         throw new ApiStatusException(...$args);
