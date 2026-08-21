@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- ci: auto-bump releases with GitHub Release + package publish
+
 ## [0.1.0] — 2026-08-21
 
 ### Added

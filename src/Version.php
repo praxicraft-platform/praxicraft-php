@@ -6,5 +6,5 @@ namespace Praxicraft\Assess;
 
 final class Version
 {
-    public const STRING = '0.1.0';
+    public const STRING = '0.1.1';
 }
