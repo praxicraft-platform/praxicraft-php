@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- ci: release via tags only (no push to main) (#3)
+- docs: add CODE_OF_CONDUCT and update CONTRIBUTING (#2)
+
 ## 0.1.1
 
 - ci: auto-bump releases with GitHub Release + package publish
