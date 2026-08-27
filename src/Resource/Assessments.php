@@ -47,39 +47,39 @@ final class Assessments
     }
 
     /** @param array<string, mixed>|null $params */
-    public function listCases(string $assessment, ?array $params = null): mixed
+    public function listTasks(string $assessment, ?array $params = null): mixed
     {
         $key = Client::pathSegment($assessment, 'assessment');
-        return $this->client->get("/assessments/{$key}/cases/", $params);
+        return $this->client->get("/assessments/{$key}/tasks/", $params);
     }
 
     /** @param array<string, mixed> $args */
-    public function attachCases(string $assessment, array $args): mixed
+    public function attachTasks(string $assessment, array $args): mixed
     {
         if ($args === []) {
-            throw new ApiException('attachCases() requires cases or case_id', 'INVALID_ARGUMENT');
+            throw new ApiException('attachTasks() requires tasks or task_id', 'INVALID_ARGUMENT');
         }
         $key = Client::pathSegment($assessment, 'assessment');
-        return $this->client->post("/assessments/{$key}/cases/attach/", $args);
+        return $this->client->post("/assessments/{$key}/tasks/attach/", $args);
     }
 
     /**
-     * @param list<array<string, mixed>> $cases
+     * @param list<array<string, mixed>> $tasks
      * @param array<string, mixed> $extra
      */
-    public function replaceCases(string $assessment, array $cases, array $extra = []): mixed
+    public function replaceTasks(string $assessment, array $tasks, array $extra = []): mixed
     {
         $key = Client::pathSegment($assessment, 'assessment');
-        return $this->client->put("/assessments/{$key}/cases/replace/", array_merge(['cases' => $cases], $extra));
+        return $this->client->put("/assessments/{$key}/tasks/replace/", array_merge(['tasks' => $tasks], $extra));
     }
 
-    public function removeCase(string $assessment, string $assessmentCaseId): mixed
+    public function removeTask(string $assessment, string $assessmentTaskId): mixed
     {
         $key = Client::pathSegment($assessment, 'assessment');
-        $caseId = trim($assessmentCaseId);
-        if ($caseId === '') {
-            throw new ApiException('assessmentCaseId must be a non-empty string', 'INVALID_ARGUMENT');
+        $taskId = trim($assessmentTaskId);
+        if ($taskId === '') {
+            throw new ApiException('assessmentTaskId must be a non-empty string', 'INVALID_ARGUMENT');
         }
-        return $this->client->delete("/assessments/{$key}/cases/remove/", ['assessment_case_id' => $caseId]);
+        return $this->client->delete("/assessments/{$key}/tasks/remove/", ['assessment_task_id' => $taskId]);
     }
 }

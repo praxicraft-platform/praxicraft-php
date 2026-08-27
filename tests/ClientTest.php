@@ -47,4 +47,40 @@ final class ClientTest extends TestCase
         $this->expectException(AuthenticationException::class);
         $client->org->retrieve();
     }
+
+    public function testAssessmentTaskPathsAndBodyKeys(): void
+    {
+        $calls = [];
+        $client = new Client([
+            'apiKey' => 'ct_test_x',
+            'httpHandler' => function (string $method, string $url, array $headers, ?string $body) use (&$calls) {
+                $calls[] = [$method, $url, $body !== null ? json_decode($body, true, 512, JSON_THROW_ON_ERROR) : null];
+                if (str_ends_with($url, '/tasks/attach/')) {
+                    return ['status' => 200, 'headers' => [], 'body' => json_encode(['attached' => 1], JSON_THROW_ON_ERROR)];
+                }
+                if (str_ends_with($url, '/tasks/remove/')) {
+                    return ['status' => 204, 'headers' => [], 'body' => ''];
+                }
+
+                return ['status' => 200, 'headers' => [], 'body' => json_encode(['results' => [['id' => 'row-1']]], JSON_THROW_ON_ERROR)];
+            },
+        ]);
+
+        $client->assessments->attachTasks('demo', [
+            'tasks' => [['task_id' => 'task-1', 'source' => 'platform']],
+        ]);
+        $client->assessments->listTasks('demo');
+        $client->assessments->removeTask('demo', 'row-1');
+
+        $this->assertSame('POST', $calls[0][0]);
+        $this->assertStringContainsString('/assessments/demo/tasks/attach/', $calls[0][1]);
+        $this->assertSame(['tasks' => [['task_id' => 'task-1', 'source' => 'platform']]], $calls[0][2]);
+
+        $this->assertSame('GET', $calls[1][0]);
+        $this->assertStringContainsString('/assessments/demo/tasks/', $calls[1][1]);
+
+        $this->assertSame('DELETE', $calls[2][0]);
+        $this->assertStringContainsString('/assessments/demo/tasks/remove/', $calls[2][1]);
+        $this->assertSame(['assessment_task_id' => 'row-1'], $calls[2][2]);
+    }
 }
